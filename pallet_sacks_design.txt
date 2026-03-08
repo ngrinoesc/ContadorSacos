@@ -1,0 +1,109 @@
+
+        const SACOS_POR_FILA = 7;
+        const TOTAL_MAX = 70;
+        
+        // Constantes Geométricas para un ajuste perfecto (4x4 aprox)
+        const W = 1.333; // Ancho del saco
+        const L = 2.0;   // Largo del saco
+        const H = 0.42;  // Altura del saco
+        
+        // El bloque total mide: (L + 2W) de ancho y (3W) de profundidad
+        // Con estos valores: 2.0 + 2.666 = 4.666 de ancho | 3 * 1.333 = 4.0 de profundidad
+        const TOTAL_WIDTH = L + (2 * W); 
+        const TOTAL_DEPTH = 3 * W;
+
+        function createCustomPallet() {
+            const woodMat = new THREE.MeshPhongMaterial({ color: 0x4a3728 });
+            const palletBase = new THREE.Group();
+            
+            // Listones superiores ajustados al bloque de sacos
+            const slatWidth = TOTAL_WIDTH + 0.2;
+            const slatDepth = 0.5;
+            for(let i = 0; i < 6; i++) {
+                const slat = new THREE.Mesh(new THREE.BoxGeometry(slatWidth, 0.12, slatDepth), woodMat);
+                slat.position.set(0, 0, (i * (TOTAL_DEPTH/5)) - (TOTAL_DEPTH/2));
+                slat.castShadow = true;
+                slat.receiveShadow = true;
+                palletBase.add(slat);
+            }
+
+            // Vigas de soporte
+            const beamGeom = new THREE.BoxGeometry(slatWidth, 0.2, 0.15);
+            for(let i = -1; i <= 1; i++) {
+                const beam = new THREE.Mesh(beamGeom, woodMat);
+                beam.position.set(0, -0.16, i * (TOTAL_DEPTH/2 - 0.1));
+                palletBase.add(beam);
+            }
+
+            palletBase.position.y = 0.4;
+            mainGroup.add(palletBase);
+        }
+
+        function createBag(isFull) {
+            const geometry = new THREE.BoxGeometry(1, 1, 1);
+            const material = new THREE.MeshPhongMaterial({ 
+                color: isFull ? 0xffffff : 0x1e293b,
+                opacity: isFull ? 1.0 : 0.05,
+                transparent: !isFull,
+                shininess: 20
+            });
+            const mesh = new THREE.Mesh(geometry, material);
+            
+            if(isFull) {
+                mesh.castShadow = true;
+                mesh.receiveShadow = true;
+                
+                // Agregar bordes negros para diferenciar los sacos
+                const edges = new THREE.EdgesGeometry(geometry);
+                const line = new THREE.LineSegments(edges, new THREE.LineBasicMaterial({ color: 0x000000 }));
+                mesh.add(line);
+            }
+            return mesh;
+        }
+
+        function updateSacks(count) {
+            sackGroup.clear();
+            
+            for (let i = 0; i < TOTAL_MAX; i++) {
+                const layerIndex = Math.floor(i / SACOS_POR_FILA);
+                const posInLayer = i % SACOS_POR_FILA;
+                const isFull = i < count;
+                const isEvenLayer = layerIndex % 2 === 0;
+
+                const bag = createBag(isFull);
+                
+                // LÓGICA DE ALINEACIÓN POR BORDES (Footprint 4.66 x 4.0)
+                if (posInLayer < 4) {
+                    // Bloque de 4 sacos (Verticales)
+                    const row = Math.floor(posInLayer / 2);
+                    const col = posInLayer % 2;
+                    bag.scale.set(W, H, L);
+                    
+                    // Calculamos X para que el borde exterior sea ±TOTAL_WIDTH/2
+                    let x = (TOTAL_WIDTH / 2) - L - (W / 2) - (col * W);
+                    let z = (row === 0 ? -L/2 : L/2);
+                    
+                    if (!isEvenLayer) {
+                        x = -x; // Inversión para trabado (mantiene el bloque centrado)
+                    }
+
+                    bag.position.set(x, (layerIndex * (H + 0.01)) + 0.75, z);
+                } 
+                else {
+                    // Bloque de 3 sacos (Horizontales)
+                    const hIndex = posInLayer - 4;
+                    bag.scale.set(L, H, W);
+                    
+                    let x = (TOTAL_WIDTH / 2) - (L / 2);
+                    let z = (hIndex - 1) * W;
+
+                    if (!isEvenLayer) {
+                        x = -x;
+                    }
+
+                    bag.position.set(x, (layerIndex * (H + 0.01)) + 0.75, z);
+                }
+
+                sackGroup.add(bag);
+            }
+        }
