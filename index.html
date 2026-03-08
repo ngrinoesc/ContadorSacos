@@ -408,7 +408,7 @@
                 // Fill up the found pallet
                 let fill = Math.min(qty, TOTAL_MAX_PALLET - p.sacks);
                 for(let k=0; k<fill; k++) {
-                    p.colors.push(colorHex);
+                    p.colors.push({hex: colorHex, type: select.options[select.selectedIndex].text});
                 }
                 p.sacks += fill; 
                 qty -= fill;
@@ -444,7 +444,8 @@
                 const even = layer % 2 === 0;
                 
                 // Fetch the color registered for this specific sack to allow mixed palettes
-                const bagColor = p.colors[i] || '#ffffff';
+                const bagData = p.colors[i];
+                const bagColor = bagData ? bagData.hex : '#ffffff';
                 const bag = createBag(bagColor);
                 
                 if (sub < 4) { // Orientación A
@@ -470,21 +471,32 @@
             document.getElementById('emptyTruckMsg').style.display = loadedPallets.length ? 'none' : 'flex';
             
             status.innerHTML = loadedPallets.map((p, i) => {
-                const lastColor = p.colors.length > 0 ? p.colors[p.colors.length - 1] : '#ccc';
-                const percentage = (p.sacks / TOTAL_MAX_PALLET) * 100;
+                const totalSacks = p.sacks;
+                const percentage = (totalSacks / TOTAL_MAX_PALLET) * 100;
+                
+                // Agrupar colores
+                const colorCounts = {};
+                p.colors.forEach(item => {
+                    if(colorCounts[item.hex]) colorCounts[item.hex].count++;
+                    else colorCounts[item.hex] = { count: 1, type: item.type };
+                });
+                
+                // Construir la barra de progreso segmentada
+                const segmentsHTML = Object.entries(colorCounts).map(([hex, data]) => {
+                    const segPercent = (data.count / TOTAL_MAX_PALLET) * 100;
+                    return `<div class="h-full transition-all duration-500 ease-out" style="width: ${segPercent}%; background-color: ${hex}"></div>`;
+                }).join('');
                 
                 return `
                 <div class="flex flex-col bg-white p-3 md:p-4 rounded-2xl border border-slate-100 shadow-sm">
                     <div class="w-full flex justify-between items-center mb-2.5">
                         <span class="font-black text-[10px] md:text-xs text-slate-800 tracking-tight">PALET ${i + 1}</span>
                         <div class="flex items-center gap-1.5">
-                            <span class="text-[10px] font-black ${p.sacks === 70 ? 'text-emerald-500' : 'text-slate-400'}">${p.sacks}/70</span>
-                            <div class="w-2.5 h-2.5 rounded-full shadow-inner" style="background-color: ${lastColor}"></div>
+                            <span class="text-[10px] font-black ${totalSacks === 70 ? 'text-emerald-500' : 'text-slate-400'}">${totalSacks}/70</span>
                         </div>
                     </div>
-                    <div class="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
-                        <div class="h-full rounded-full transition-all duration-700 ease-out" 
-                             style="width: ${percentage}%; background-color: ${percentage === 100 ? '#10b981' : '#3b82f6'}"></div>
+                    <div class="w-full bg-slate-100 rounded-full h-2 overflow-hidden flex">
+                        ${segmentsHTML}
                     </div>
                 </div>
             `}).join('');
