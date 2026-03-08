@@ -96,19 +96,75 @@
             sackGroup = new THREE.Group();
             mainGroup.add(sackGroup);
 
-            // Controles de ratón
-            document.addEventListener('mousedown', () => isMouseDown = true);
+            // Controles de ratón y táctiles
+            let lastTapTime = 0;
+            const DOUBLE_TAP_DELAY = 300; // ms
+
+            document.addEventListener('mousedown', (event) => {
+                isMouseDown = true;
+                handleInteractionStart(event.clientX, event.clientY);
+            });
             document.addEventListener('mouseup', () => isMouseDown = false);
-            document.addEventListener('mousemove', (e) => {
-                if(isMouseDown) {
-                    targetRotationY += e.movementX * 0.007;
-                    targetRotationX += e.movementY * 0.007;
+            document.addEventListener('mousemove', (event) => {
+                if (isMouseDown) {
+                    handleInteractionMove(event.clientX, event.clientY);
                 }
             });
+
+            document.addEventListener('touchstart', (event) => {
+                isMouseDown = true;
+                const currentTime = new Date().getTime();
+                const tapLength = currentTime - lastTapTime;
+                if (tapLength < DOUBLE_TAP_DELAY && tapLength > 0) {
+                    // Double tap detected, prevent rotation
+                    isMouseDown = false;
+                }
+                lastTapTime = currentTime;
+                handleInteractionStart(event.touches[0].clientX, event.touches[0].clientY);
+            });
+            document.addEventListener('touchend', () => isMouseDown = false);
+            document.addEventListener('touchmove', (event) => {
+                if (isMouseDown) {
+                    event.preventDefault(); // Prevent scrolling while dragging
+                    handleInteractionMove(event.touches[0].clientX, event.touches[0].clientY);
+                }
+            });
+
+            let previousMouseX = 0;
+            let previousMouseY = 0;
+
+            function handleInteractionStart(clientX, clientY) {
+                previousMouseX = clientX;
+                previousMouseY = clientY;
+            }
+
+            function handleInteractionMove(clientX, clientY) {
+                const deltaX = clientX - previousMouseX;
+                const deltaY = clientY - previousMouseY;
+
+                targetRotationY += deltaX * 0.005;
+                targetRotationX += deltaY * 0.005;
+
+                // Clamp targetRotationX to prevent camera from going upside down
+                targetRotationX = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, targetRotationX));
+
+                previousMouseX = clientX;
+                previousMouseY = clientY;
+            }
 
             window.addEventListener('resize', onWindowResize);
             updateSacks(10);
         }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            mainGroup.rotation.y += (targetRotationY - mainGroup.rotation.y) * 0.05;
+            mainGroup.rotation.x += (targetRotationX - mainGroup.rotation.x) * 0.05; // Added X-axis rotation
+            renderer.render(scene, camera);
+        }
+
+        init();
+        animate(); // Start the animation loop
 
         function createCustomPallet() {
             const woodMat = new THREE.MeshPhongMaterial({ color: 0x4a3728 });
